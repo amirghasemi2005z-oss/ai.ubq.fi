@@ -9,6 +9,19 @@
 - Pinned Deno is permitted only for the explicit offline legacy V8 codec and reverse-conversion helper, plus the external tool-owned evidence helper. It is not the application runtime or an ordinary build, test, or CI dependency. Preserve real OS read/write/network/process confinement; unsupported platform enforcement must fail closed rather than use a JavaScript permission facade.
 - The Bun migration PR does not authorize production or Mac service activation, live database conversion, credential changes, or provider-credit spend. Retain every credential, routing, accounting, review, ownership, immutable-release, and client-acceptance rule below.
 
+## Rust Port Rules
+
+- The owner's Rust rules are non-negotiable for every first-party crate under `rust/crates` and every new Rust source file; they were recorded from <https://x.com/dj_d_sol/status/2113543433516421153> on 2026-10-23.
+- No first-party crate may exceed 1000 lines. Measure the crate's owned production Rust source under `src/`; integration tests and vendored dependencies are separate crates.
+- No re-exports. Do not forward names with `pub use`; import each item from its defining module.
+- No `#[path = "..."]`. Keep the module tree conventional and move shared test or support code into a real module.
+- No `include!`. Use modules and typed constants instead of splicing source text into a crate.
+- The current port predates these rules and is not compliant. Treat existing violations as mandatory migration debt, not precedent: no change may add or enlarge a violation, new or substantially rewritten crates must comply immediately, and the port cannot be accepted as complete until every remaining violation is removed.
+- `scripts/rust-quality.ts` is the structural ratchet: `bun run rust:quality` enforces crate size and all rule violations; `bun run rust:quality:update` may only tighten the baseline.
+- Lint policy is selective. No `#[allow]` or `#[expect]` suppressions; no whole `pedantic`/`restriction` groups. Stage a noisy lint with `--force-warn` plus a baseline before making it fatal. Do not copy the TypeScript cognitive-complexity number into Clippy; use the 120-line function, 7-argument, nesting-5 thresholds in `rust/clippy.toml`.
+- Compile performance is measured, not assumed. Keep `[profile.release]` unchanged until the complete Worker build is measured; use the separate `release-candidate` profile for thin-LTO experiments, and keep dev/test debug at line tables only.
+- New crates target one cohesive responsibility at 600-850 lines. Test targets are separate crates with the same 1000-line cap. The full policy and migration order are in `docs/research/rust-quality-compile-performance-2026-10-23.md`.
+
 ## Local Credential Recovery Safety
 
 - A request to repair one invalid local provider account does not authorize invalidating, revoking, rotating, or
