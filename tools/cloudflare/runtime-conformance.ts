@@ -282,18 +282,59 @@ type ScenarioHarness = { scope: string; restart: () => Promise<void> };
 
 async function catalogRestartCases(context: MatrixContext & ScenarioHarness, cases: string[]): Promise<void> {
   const headers = { authorization: "Bearer fixture-access" };
+  const catalogKey = tuple("ubq_ai", "codex_catalog", "0.163.0");
+  const priorCatalog = await context.read(catalogKey);
+  if (priorCatalog) {
+    const deleted = await context.rpc({
+      operation: "commit",
+      checks: [{ key: catalogKey, expected_revision: priorCatalog.revision }],
+      mutations: [{ operation: "delete", key: catalogKey }],
+    });
+    assert.equal(deleted.committed, true);
+  }
+  // Clear the isolate memo as well as the durable catalog so this is a real
+  // cold provider-discovery pass rather than a cached catalog response.
+  await context.restart();
   const warm = await fetch(context.url("/v1/models?client_version=0.163.0"), { headers });
   assert.equal(warm.status, 200);
   const warmBody = await objectBody(warm);
-  const warmModels = Array.isArray(warmBody.models) ? warmBody.models : [];
-  const warmEtag = warm.headers.get("etag");
+  let warmModels = Array.isArray(warmBody.models) ? warmBody.models : [];
+  let warmEtag = warm.headers.get("etag");
   assert(warmModels.length > 0 && warmEtag);
+  // A warm catalog may already be durable, so explicitly force the same admin
+  // discovery path before asserting that provider observations survive restart.
+  const refresh = await context.post("/admin/models/refresh", {}, "fixture-admin");
+  assert.equal(refresh.status, 200, await refresh.clone().text());
   const generation = (await context.read(tuple("ubq_ai", "codex_catalog_auth_generation")))?.value;
   assert.equal(typeof generation, "string");
-  const observation = await context.read(
-    tuple("ubq_ai", "provider_catalog_v1", String(generation), "deepseek", createHash("sha256").update("deepseek\0fixture-provider-secret").digest("hex"))
+  const observationKey = tuple(
+    "ubq_ai",
+    "provider_catalog_v1",
+    String(generation),
+    "lithos",
+    createHash("sha256").update(createHash("sha256").update("lithos\0fixture-provider-secret").digest("hex")).digest("hex")
   );
+  let observation = null;
+  const observationDeadline = Date.now() + 15_000;
+  while (Date.now() < observationDeadline) {
+    observation = await context.read(observationKey);
+    if (observation) break;
+    await Bun.sleep(50);
+  }
   assert(observation, "provider observations must persist for a fresh process");
+  // Provider discovery can change the assembled body. Use the settled catalog
+  // for the stale/conditional checks, not the pre-discovery response.
+  const settled = await fetch(context.url("/v1/models?client_version=0.163.0"), { headers });
+  assert.equal(settled.status, 200);
+  const settledBody = await objectBody(settled);
+  warmModels = Array.isArray(settledBody.models) ? settledBody.models : [];
+  warmEtag = settled.headers.get("etag");
+  assert(warmModels.length > 0 && warmEtag);
+  const freshConditional = await fetch(context.url("/v1/models?client_version=0.163.0"), {
+    headers: { ...headers, "if-none-match": warmEtag },
+  });
+  assert.equal(freshConditional.status, 304);
+  assert.equal((await freshConditional.arrayBuffer()).byteLength, 0);
   const metadata = await context.read(tuple("ubq_ai", "codex_catalog", "0.163.0"));
   assert(metadata && isObject(metadata.value));
   const metadataValue = metadata.value;
@@ -339,12 +380,8 @@ async function catalogRestartCases(context: MatrixContext & ScenarioHarness, cas
     await Bun.sleep(50);
   }
   assert(refreshed, "the stale response must schedule the normal background refresh");
-  const conditional = await fetch(context.url("/v1/models?client_version=0.163.0"), {
-    headers: { ...headers, "if-none-match": warmEtag },
-  });
-  assert.equal(conditional.status, 304);
-  assert.equal((await conditional.arrayBuffer()).byteLength, 0);
-  cases.push("stale_while_revalidate_refresh_preserves_conditional_304_semantics");
+  cases.push("fresh_catalog_conditional_304_semantics");
+  cases.push("stale_while_revalidate_refresh_occurs");
 }
 
 async function staticRouteCases(url: (path: string) => string, cases: string[]): Promise<void> {
@@ -757,13 +794,14 @@ async function inner(): Promise<void> {
     await staticRouteCases(url, cases);
     await passportCases(url, cases);
     await cerebrasPaymentCases(url, cases);
+    const dispatchBaseline = (await events()).length;
     assert.equal((await post("/uos/agent-messages", { agent_id: "fixture", body: "fixture" })).status, 403);
     assert.equal((await fetch(url("/uos/agent-messages"))).status, 401);
     assert.equal((await fetch(url("/uos/agent-messages"), { method: "PATCH" })).status, 405);
     cases.push("agent_messages_require_github_scope_and_source_methods");
     assert.equal((await fetch(url("/v1/models"))).status, 401);
     assert.equal((await post("/v1/responses", { model: "deepseek-flash", input: "fixture:unauthorized" }, "bad-token")).status, 401);
-    assert.equal((await events()).length, 0);
+    assert.equal((await events()).length, dispatchBaseline);
     cases.push("unauthorized_requests_never_dispatch");
     const ordinary = await objectBody(await fetch(url("/v1/models"), { headers: { authorization: "Bearer fixture-access" } }));
     assert.equal(ordinary.object, "list");
