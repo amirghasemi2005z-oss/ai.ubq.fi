@@ -1240,7 +1240,7 @@ test("unchecking Codex during a pending provider save removes missing subscripti
   succeed({ provider_ids: [removed, "codex:one", "surplus"] });
   await saving;
 
-  assert.deepEqual(sorted(harness.state().saved), [removed, "codex:one", "surplus"].sort());
+  assert.deepEqual(sorted(harness.state().saved), sorted([removed, "codex:one", "surplus"]));
   assert.deepEqual(sorted(harness.state().staged), ["surplus"], "the later tier-off edit covers configured and missing subscriptions");
   assert.equal(harness.unsaved(), true);
   assert.deepEqual(successes, ["2 providers active"], "the completed request reports its saved tiers before the later edit");
