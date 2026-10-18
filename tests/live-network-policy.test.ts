@@ -46,7 +46,8 @@ test("only the explicitly selected e2e segment selects the live policy", () => {
     }
   }
   expect(groupsFor("files", ["tests/live-default-model.e2e.ts"]).map((group) => group.network)).toEqual([undefined]);
-  const [e2e] = groupsFor("e2e", []);
+  // Explicit fixture selection keeps this policy check independent of the current changed-path scope.
+  const [e2e] = groupsFor("e2e", ["tests/live-default-model.e2e.ts"]);
   expect(e2e.network).toBe("live");
   // The runner approves the same default origin the e2e file falls back to: one shared constant.
   expect(LIVE_E2E_DEFAULT_BASE_URL).toBe("https://ai.ubq.fi");
@@ -56,7 +57,7 @@ test("only the explicitly selected e2e segment selects the live policy", () => {
 });
 
 test("the runner builds every group's network boundary before the native build", () => {
-  const [e2e] = groupsFor("e2e", []);
+  const [e2e] = groupsFor("e2e", ["tests/live-default-model.e2e.ts"]);
   const built: { command: readonly string[]; policy: TestNetworkPolicy }[] = [];
   const missingMount = (command: readonly string[], policy: TestNetworkPolicy = {}): string[] => {
     built.push({ command, policy });
@@ -76,7 +77,7 @@ test("the runner builds every group's network boundary before the native build",
 });
 
 test("the runner loop gives each live file its own relay parent and cleans it before the next file", async () => {
-  const live = { ...groupsFor("e2e", [])[0], files: ["tests/live-default-model.e2e.ts", "tests/live-network-policy.test.ts"] };
+  const live = { ...groupsFor("e2e", ["tests/live-default-model.e2e.ts"])[0], files: ["tests/live-default-model.e2e.ts", "tests/live-network-policy.test.ts"] };
   const groups = validatedGroups([live, ...groupsFor("files", ["tests/live-network-policy.test.ts"])], { BASE_URL: "http://127.0.0.1:8123" }, () => []);
   const parents: string[] = [];
   const paths: string[] = [];
@@ -107,7 +108,7 @@ test("the runner loop gives each live file its own relay parent and cleans it be
 });
 
 test("the runner loop removes the live relay parent when running a file throws", async () => {
-  const groups = validatedGroups(groupsFor("e2e", []), { BASE_URL: "http://127.0.0.1:8123" }, () => []);
+  const groups = validatedGroups(groupsFor("e2e", ["tests/live-default-model.e2e.ts"]), { BASE_URL: "http://127.0.0.1:8123" }, () => []);
   let parent = "";
   await assert.rejects(
     runGroups(groups, (_path, selected) => {
