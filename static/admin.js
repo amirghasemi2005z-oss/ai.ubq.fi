@@ -9566,6 +9566,10 @@ const loadModelsWhitelist = async (options = {}) => {
     return;
   }
   const loadId = ++modelsLoadId;
+  if (modelsSaving) {
+    modelsSaving = false;
+    updateModelsStatus();
+  }
   setModelsWhitelistBadge("unknown", modelsLoadedAt ? "Cached · refreshing" : "Loading...");
   // The provider chips and labels come from the roster, so this tab asks for it
   // when the Providers prefetch has not already loaded the shared dictionary.
