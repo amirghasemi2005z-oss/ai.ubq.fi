@@ -828,6 +828,60 @@ test("id-less completed chat parts are reconciled by output position", () => {
   assert.deepEqual(response, { outputText: "haha", refusal: "" });
 });
 
+test("id-less aggregate terminal items reconcile all identified positions", () => {
+  const textParts = new Map<string, string>();
+  const refusalParts = new Map<string, string>();
+  assert.deepEqual(
+    reconcileChatContentPart(textParts, refusalParts, { item_id: "item-0", output_index: 0 }, { type: "output_text", text: "ha" }),
+    { outputText: "ha", refusal: "" }
+  );
+  assert.deepEqual(
+    reconcileChatContentPart(textParts, refusalParts, { item_id: "item-1", output_index: 1 }, { type: "output_text", text: "ha" }),
+    { outputText: "ha", refusal: "" }
+  );
+  assert.deepEqual(
+    reconcileChatOutputItemContent(textParts, refusalParts, {}, { content: [{ type: "output_text", text: "haha" }] }),
+    { outputText: "", refusal: "" },
+    "an id-less output item repeating all positions contributes no duplicate text"
+  );
+
+  const responseTextParts = new Map<string, string>();
+  const responseRefusalParts = new Map<string, string>();
+  reconcileChatContentPart(responseTextParts, responseRefusalParts, { item_id: "item-0", output_index: 0 }, { type: "output_text", text: "ha" });
+  reconcileChatContentPart(responseTextParts, responseRefusalParts, { item_id: "item-1", output_index: 1 }, { type: "output_text", text: "ha" });
+  assert.deepEqual(
+    reconcileChatResponseOutputContent(responseTextParts, responseRefusalParts, {}, [{ content: [{ type: "output_text", text: "haha" }] }]),
+    { outputText: "", refusal: "" },
+    "an id-less response output repeating all positions contributes no duplicate text"
+  );
+});
+
+test("identified completed parts reuse the item-id alias when output_index is omitted", () => {
+  const textParts = new Map<string, string>();
+  assert.deepEqual(
+    reconcileChatContentPart(textParts, new Map(), { item_id: "item-1", output_index: 0 }, { type: "output_text", text: "hello" }),
+    { outputText: "hello", refusal: "" }
+  );
+  assert.equal(textParts.get("output:0:0"), "hello");
+  assert.equal(textParts.get("item:item-1:0"), "hello");
+  assert.deepEqual(
+    reconcileChatContentPart(textParts, new Map(), { item_id: "item-1" }, { type: "output_text", text: "hello" }),
+    { outputText: "", refusal: "" },
+    "a completed text part without positional metadata is not emitted twice"
+  );
+
+  const refusalParts = new Map<string, string>();
+  assert.deepEqual(
+    reconcileChatContentPart(new Map(), refusalParts, { item_id: "item-1", output_index: 0 }, { type: "refusal", refusal: "no" }),
+    { outputText: "", refusal: "no" }
+  );
+  assert.deepEqual(
+    reconcileChatContentPart(new Map(), refusalParts, { item_id: "item-1" }, { type: "refusal", refusal: "no" }),
+    { outputText: "", refusal: "" },
+    "a completed refusal part without positional metadata is not emitted twice"
+  );
+});
+
 test("completed output items and response outputs accumulate their content", () => {
   const textParts = new Map<string, string>();
   const refusalParts = new Map<string, string>();
