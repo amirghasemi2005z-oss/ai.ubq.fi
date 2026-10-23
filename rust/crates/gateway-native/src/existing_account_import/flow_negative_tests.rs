@@ -354,7 +354,14 @@ fn actual_lost_publication_reply_reconciles_only_the_same_native_receipt() {
         .drop_publication
         .store(true, Ordering::SeqCst);
     let (mut child, address) = start_custodian(&root, &servers, account.clone());
-    let (response, _) = request(&store, &root.path().join("home"), account, address, NEW);
+    let (response, _) = request(
+        &store,
+        &root.path().join("home"),
+        account,
+        address,
+        NEW,
+        &mut child,
+    );
     assert!(response.starts_with(b"HTTP/1.1 200 "));
     child.wait_clean();
     let phases = servers.traffic.phases.lock().unwrap();

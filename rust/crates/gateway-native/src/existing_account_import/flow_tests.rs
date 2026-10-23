@@ -919,6 +919,7 @@ fn request(
     account: String,
     address: std::net::SocketAddr,
     body: &[u8],
+    child: &mut OwnedGroup,
 ) -> (Vec<u8>, NativeImportMetadata) {
     let authority = authority(store);
     let identity = id();
@@ -973,6 +974,19 @@ fn request(
         saved
             .write_all(&response[..response.len().min(8192)])
             .unwrap();
+        thread::sleep(Duration::from_millis(250));
+        let status = child
+            .child
+            .as_mut()
+            .and_then(|process| process.try_wait().ok().flatten());
+        let child_stdout = fs::read(home.parent().unwrap().join("custodian.stdout"))
+            .map(|bytes| {
+                String::from_utf8_lossy(&bytes)
+                    .chars()
+                    .take(4096)
+                    .collect::<String>()
+            })
+            .unwrap_or_else(|_| "unavailable".into());
         let child_stderr = fs::read(home.parent().unwrap().join("custodian.stderr"))
             .map(|bytes| {
                 String::from_utf8_lossy(&bytes)
@@ -982,7 +996,7 @@ fn request(
             })
             .unwrap_or_else(|_| "unavailable".into());
         panic!(
-            "native response read failed ({:?}); {} bytes observed, bounded private response retained; custodian stderr: {child_stderr}",
+            "native response read failed ({:?}); {} bytes observed, bounded private response retained; child status: {status:?}; custodian stdout: {child_stdout}; custodian stderr: {child_stderr}",
             error.kind(),
             response.len()
         );
@@ -996,7 +1010,14 @@ fn actual_existing_account_original_start_owned_child_custody_durability_and_pub
     let account = setup(&store, &root.path().join("home"));
     let servers = Servers::start(store.clone(), root.path().join("home"));
     let (mut child, address) = start_custodian(&root, &servers, account.clone());
-    let (response, _metadata) = request(&store, &root.path().join("home"), account, address, NEW);
+    let (response, _metadata) = request(
+        &store,
+        &root.path().join("home"),
+        account,
+        address,
+        NEW,
+        &mut child,
+    );
     assert!(
         response.starts_with(b"HTTP/1.1 200 "),
         "real source success required, not a dummy200 or narrowed unavailable path: {}",
