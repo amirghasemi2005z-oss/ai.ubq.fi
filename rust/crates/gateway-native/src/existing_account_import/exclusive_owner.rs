@@ -224,6 +224,16 @@ impl ExclusiveManagedOwner {
         let leaf = this.anchors.last().ok_or_else(fail)?;
         #[cfg(test)]
         eprintln!("NATIVE_PREPARE_STAGE leaf");
+        #[cfg(test)]
+        {
+            let stored = Facts::read(&store.directory)?;
+            eprintln!(
+                "NATIVE_PREPARE_LEAF leaf={:?} stored={:?} same={}",
+                leaf.facts,
+                stored,
+                stored.same_object(&leaf.facts)
+            );
+        }
         if leaf.facts.uid != writer
             || leaf.facts.mode & 0o777 != 0o700
             || !Facts::read(&store.directory)?.same_object(&leaf.facts)
