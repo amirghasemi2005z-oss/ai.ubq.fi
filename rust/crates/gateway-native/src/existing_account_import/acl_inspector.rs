@@ -92,6 +92,8 @@ pub(super) fn observe(
             .map_err(|_| fail())?;
         let result = capture(&mut child, &mut out, &mut err, deadline);
         if result.is_err() {
+            #[cfg(test)]
+            eprintln!("ACL_CAPTURE_FAIL");
             let _ = child.kill();
             let _ = child.wait();
         }
@@ -100,7 +102,15 @@ pub(super) fn observe(
         if Facts::read(directory)? != before {
             return Err(fail());
         }
-        parse(&stdout, &before)
+        let parsed = parse(&stdout, &before);
+        #[cfg(test)]
+        if parsed.is_err() {
+            eprintln!(
+                "ACL_PARSE_FAIL output={:?}",
+                String::from_utf8_lossy(&stdout)
+            );
+        }
+        parsed
     }
 }
 #[cfg(target_os = "macos")]
