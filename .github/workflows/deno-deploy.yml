@@ -47,32 +47,6 @@ env:
   GITHUB_PR_AUTHOR: ${{ github.event_name == 'workflow_dispatch' && inputs.sentinel_pr_author || github.event.pull_request.user.login }}
 
 jobs:
-  inspect-ls:
-    if: ${{ inputs.inspect_ls == true }}
-    runs-on: macos-26
-    timeout-minutes: 5
-    steps:
-      - name: Print the reviewed runner OS-tool digest
-        shell: bash
-        run: |
-          /usr/bin/sw_vers
-          /usr/bin/shasum -a 256 /bin/ls
-          for path in /private /private/tmp /private/var/tmp /tmp /Users/runner/work; do
-            echo "--- $path"
-            /bin/ls -d -l -n -e "$path"
-          done
-          echo "--- identity"
-          id -u
-          id -g
-          umask
-          /usr/bin/stat -f 'uid=%u gid=%g mode=%p links=%l size=%z' /bin/ls
-          probe=$(mktemp -d /private/tmp/native-probe.XXXXXX)
-          chmod 700 "$probe"
-          mkdir "$probe/home" "$probe/replay"
-          chmod 700 "$probe/home" "$probe/replay"
-          echo "--- probe"
-          /bin/ls -d -l -n -e "$probe" "$probe/home" "$probe/replay"
-
   scope:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true) }}
     runs-on: ubuntu-latest
