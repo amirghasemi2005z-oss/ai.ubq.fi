@@ -61,6 +61,17 @@ jobs:
             echo "--- $path"
             /bin/ls -d -l -n -e "$path"
           done
+          echo "--- identity"
+          id -u
+          id -g
+          umask
+          /usr/bin/stat -f 'uid=%u gid=%g mode=%p links=%l size=%z' /bin/ls
+          probe=$(mktemp -d /private/tmp/native-probe.XXXXXX)
+          chmod 700 "$probe"
+          mkdir "$probe/home" "$probe/replay"
+          chmod 700 "$probe/home" "$probe/replay"
+          echo "--- probe"
+          /bin/ls -d -l -n -e "$probe" "$probe/home" "$probe/replay"
 
   scope:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true) }}
