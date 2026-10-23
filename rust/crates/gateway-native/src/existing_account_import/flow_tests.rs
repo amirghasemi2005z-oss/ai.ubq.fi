@@ -973,8 +973,16 @@ fn request(
         saved
             .write_all(&response[..response.len().min(8192)])
             .unwrap();
+        let child_stderr = fs::read(home.parent().unwrap().join("custodian.stderr"))
+            .map(|bytes| {
+                String::from_utf8_lossy(&bytes)
+                    .chars()
+                    .take(4096)
+                    .collect::<String>()
+            })
+            .unwrap_or_else(|_| "unavailable".into());
         panic!(
-            "native response read failed ({:?}); {} bytes observed, bounded private response retained",
+            "native response read failed ({:?}); {} bytes observed, bounded private response retained; custodian stderr: {child_stderr}",
             error.kind(),
             response.len()
         );
