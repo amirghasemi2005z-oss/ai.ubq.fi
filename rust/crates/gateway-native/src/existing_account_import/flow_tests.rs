@@ -739,6 +739,46 @@ fn controlled_custodian_process() {
     let inspector = artifact("uos-native-owner-inspect");
     let inspector_hash = sha256_hex(&fs::read(&inspector).unwrap());
     let uid = rustix::process::getuid().as_raw();
+    eprintln!(
+        "NATIVE_PREPARE uid={} euid={} base={} root={} home={}",
+        uid,
+        rustix::process::geteuid().as_raw(),
+        base.display(),
+        root.display(),
+        setup.home.display()
+    );
+    for path in [base, root.as_path(), setup.home.as_path()] {
+        let output = Command::new("/bin/ls")
+            .args(["-d", "-l", "-n", "-e"])
+            .arg(path)
+            .env_clear()
+            .env("LC_ALL", "C")
+            .env("LANG", "C")
+            .env("TZ", "UTC")
+            .output()
+            .unwrap();
+        eprintln!(
+            "NATIVE_PREPARE_LS {} => {}{}",
+            path.display(),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let inspector_ls = Command::new("/bin/ls")
+        .args(["-l", "-n"])
+        .arg(&inspector)
+        .env_clear()
+        .env("LC_ALL", "C")
+        .env("LANG", "C")
+        .env("TZ", "UTC")
+        .output()
+        .unwrap();
+    eprintln!(
+        "NATIVE_PREPARE_INSPECTOR {} => {}{}",
+        inspector.display(),
+        String::from_utf8_lossy(&inspector_ls.stdout),
+        String::from_utf8_lossy(&inspector_ls.stderr)
+    );
     let owner = store
         .prepare_exclusive_owner(
             &registered,
