@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: ""
+      inspect_ls:
+        description: Diagnostic only; print the macOS runner /bin/ls digest
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: ai-ubq-fi-ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.merge_commit_sha || github.sha }}
@@ -42,6 +47,17 @@ env:
   GITHUB_PR_AUTHOR: ${{ github.event_name == 'workflow_dispatch' && inputs.sentinel_pr_author || github.event.pull_request.user.login }}
 
 jobs:
+  inspect-ls:
+    if: ${{ inputs.inspect_ls == true }}
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - name: Print the reviewed runner OS-tool digest
+        shell: bash
+        run: |
+          /usr/bin/sw_vers
+          /usr/bin/shasum -a 256 /bin/ls
+
   scope:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true) }}
     runs-on: ubuntu-latest
