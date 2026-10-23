@@ -145,6 +145,8 @@ impl ExclusiveManagedOwner {
         digest: &str,
         deadline: Instant,
     ) -> Result<Self, GatewayError> {
+        #[cfg(test)]
+        eprintln!("NATIVE_PREPARE_STAGE identity");
         let uid = rustix::process::getuid();
         let effective = rustix::process::geteuid();
         if uid.is_root()
@@ -159,7 +161,11 @@ impl ExclusiveManagedOwner {
         {
             return Err(fail());
         }
+        #[cfg(test)]
+        eprintln!("NATIVE_PREPARE_STAGE inspector");
         let inspector = PinnedExecutable::verify(inspector, digest)?;
+        #[cfg(test)]
+        eprintln!("NATIVE_PREPARE_STAGE anchors");
         let mut anchors = Vec::new();
         let root = File::from(
             openat(
@@ -200,6 +206,8 @@ impl ExclusiveManagedOwner {
                 component: Some(name.into()),
             });
         }
+        #[cfg(test)]
+        eprintln!("NATIVE_PREPARE_STAGE anchors-ok");
         let this = Self {
             anchors,
             inspector,
@@ -208,8 +216,14 @@ impl ExclusiveManagedOwner {
             native_owner_id: store.native_owner_id.clone(),
             account_id_hash: store.account_id_hash.clone(),
         };
+        #[cfg(test)]
+        eprintln!("NATIVE_PREPARE_STAGE recheck");
         this.recheck(deadline)?;
+        #[cfg(test)]
+        eprintln!("NATIVE_PREPARE_STAGE recheck-ok");
         let leaf = this.anchors.last().ok_or_else(fail)?;
+        #[cfg(test)]
+        eprintln!("NATIVE_PREPARE_STAGE leaf");
         if leaf.facts.uid != writer
             || leaf.facts.mode & 0o777 != 0o700
             || !Facts::read(&store.directory)?.same_object(&leaf.facts)
