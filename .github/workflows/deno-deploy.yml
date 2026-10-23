@@ -57,6 +57,10 @@ jobs:
         run: |
           /usr/bin/sw_vers
           /usr/bin/shasum -a 256 /bin/ls
+          for path in /private /private/tmp /private/var/tmp /tmp /Users/runner/work; do
+            echo "--- $path"
+            /bin/ls -d -l -n -e "$path"
+          done
 
   scope:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true) }}
